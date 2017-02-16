@@ -412,6 +412,17 @@ class KingUnit(StraightMovingAndAttackingUnit):
         return tuple(result)
 
 
+class KnightUnit(StraightMovingAndAttackingUnit):
+    """国际象棋马的走法: 马走“日”的对角, 国际象棋的马不蹩腿"""
+
+    def __init__(self, owner):
+        super(KnightUnit, self).__init__(owner)
+        self.directions = \
+            [Vector(2, 1), Vector(1, 2), Vector(-1, 2), Vector(-2, 1),
+             Vector(-2, -1), Vector(-1, -2), Vector(1, -2), Vector(2, -1)]
+        self.limited_move_range = 1
+
+
 def do_self_test():
     """以下为模块自测试代码
 

@@ -246,10 +246,7 @@ class PawnUnit(Unit):
         # 再分析斜吃
         dy = self.pawn_charge_direction.dy
         squares = []
-        for dx in {-1, 1}:
-            x, y = starting_square.x + dx, starting_square.y + dy
-            if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
-                continue  # 此时已经跑到棋盘外面了
+        for x, y in self.retrieve_squares_within_shooting_range(starting_square, snapshot):
             node = snapshot.get_node(x, y)
             if not node.unit_id:
                 # 斜线方向上没有棋子时兵不能斜吃斜走, 但是吃过路兵除外
@@ -297,29 +294,13 @@ class StraightMovingAndAttackingUnit(Unit):
         :param snapshot: 作战双方棋子的位置的一个快照
         :rtype : tuple
         """
-        result = []
-        for dx, dy in self.directions:  # 每个方向单独处理
-            squares = []
-            step_count = 1
-            x, y = starting_square[0] + dx, starting_square[1] + dy
-            # 若不限制棋子移动格数则一直循环, 直到碰到其他棋子或者棋盘边界:
-            while step_count <= self.limited_move_range if self.limited_move_range > 0 else True:
-                step_count += 1
-                if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
-                    # 此时已经跑到棋盘外面了, 结束 while 循环
-                    break
-                node = snapshot.get_node(x, y)
-                if node.unit_id > 0:
-                    if node.owner == self.owner:
-                        break  # 路线被己方棋子阻挡了, 结束 while 循环
-                    if node.owner != self.owner:
-                        # 或存在敌人时, 可以占领该格
-                        squares.append(Square(x, y))
-                        break  # 结束 while 循环
+        squares = []
+        for x, y in self.retrieve_squares_within_shooting_range(starting_square, snapshot):
+            node = snapshot.get_node(x, y)
+            # 可以占领空格或攻击敌人所在的格子, 但不能攻击己方棋子所在的格子:
+            if not node.unit_id or node.owner != self.owner:
                 squares.append(Square(x, y))
-                x, y = x + dx, y + dy
-            result += squares
-        return tuple(result)
+        return tuple(squares)
 
     def retrieve_squares_within_shooting_range(self, starting_square, snapshot):
         """计算沿直线走和吃子的棋子可以的所有火力点(当前火力射程范围), 不需要区分目标格子上是敌方还是己方的棋子

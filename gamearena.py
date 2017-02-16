@@ -260,6 +260,22 @@ class PawnUnit(Unit):
         result += squares
         return tuple(result)
 
+    def retrieve_squares_within_shooting_range(self, starting_square, snapshot):
+        """分析兵可以攻击的两格火力点(射程), 不需要区分目标格子上是否为己方的棋子
+
+        :param starting_square: 兵当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        result = []
+        dy = self.pawn_charge_direction.dy
+        for dx in {-1, 1}:
+            x, y = starting_square.x + dx, starting_square.y + dy
+            if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
+                continue  # 此时已经跑到棋盘外面了
+            result.append(Square(x, y))
+        return tuple(result)
+
 
 class StraightMovingAndAttackingUnit(Unit):
     """沿直线行进并攻击敌人的棋子，包括車、象、后、王(王只能走1格)
@@ -300,6 +316,35 @@ class StraightMovingAndAttackingUnit(Unit):
                         # 或存在敌人时, 可以占领该格
                         squares.append(Square(x, y))
                         break  # 结束 while 循环
+                squares.append(Square(x, y))
+                x, y = x + dx, y + dy
+            result += squares
+        return tuple(result)
+
+    def retrieve_squares_within_shooting_range(self, starting_square, snapshot):
+        """计算沿直线走和吃子的棋子可以的所有火力点(当前火力射程范围), 不需要区分目标格子上是敌方还是己方的棋子
+
+        :param starting_square: 当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        result = []
+        for dx, dy in self.directions:  # 每个方向单独处理
+            squares = []
+            step_count = 1
+            x, y = starting_square[0] + dx, starting_square[1] + dy
+            # 若不限制棋子移动格数则一直循环, 直到碰到其他棋子或者棋盘边界:
+            while step_count <= self.limited_move_range if self.limited_move_range > 0 else True:
+                step_count += 1
+                if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
+                    # 此时已经跑到棋盘外面了, 结束 while 循环
+                    break
+                node = snapshot.get_node(x, y)
+                if node.unit_id > 0:
+                    # 存在敌人时, 火力线被敌人阻挡, 火力覆盖不到后面的位置了
+                    # 存在己方棋子时, 火力线则被己方阻挡, 结果同上
+                    squares.append(Square(x, y))
+                    break  # 结束 while 循环
                 squares.append(Square(x, y))
                 x, y = x + dx, y + dy
             result += squares

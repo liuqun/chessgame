@@ -261,6 +261,70 @@ class PawnUnit(Unit):
         return tuple(result)
 
 
+class StraightMovingAndAttackingUnit(Unit):
+    """沿直线行进并攻击敌人的棋子，包括車、象、后、王(王只能走1格)
+
+    注意:
+    中国象棋的炮只能隔子吃而不能直线吃, 所以该走法规则是不能支持中国象棋炮的
+    中国象棋的象和马有有蹩腿规则, 也需要单独判定
+    """
+
+    def __init__(self, owner):
+        super(StraightMovingAndAttackingUnit, self).__init__(owner)
+        self.directions = []  # 用一组 Vector 矢量描述棋子可以朝哪些方向走
+        self.limited_move_range = 0  # 用负数或 0 代表不限制棋子最大移动格数, 用正整数 N 代表棋子最大移动距离(倍数 N). 王和马只能按移动矢量的一倍距离进行移动(倍数 N=1)
+
+    def retrieve_valid_moves(self, starting_square, snapshot):
+        """计算走法沿直线走和吃子的棋子可以到达哪些格子
+
+        :param starting_square: 当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        result = []
+        for dx, dy in self.directions:  # 每个方向单独处理
+            squares = []
+            step_count = 1
+            x, y = starting_square[0] + dx, starting_square[1] + dy
+            # 若不限制棋子移动格数则一直循环, 直到碰到其他棋子或者棋盘边界:
+            while step_count <= self.limited_move_range if self.limited_move_range > 0 else True:
+                step_count += 1
+                if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
+                    # 此时已经跑到棋盘外面了, 结束 while 循环
+                    break
+                node = snapshot.get_node(x, y)
+                if node.unit_id > 0:
+                    if node.owner == self.owner:
+                        break  # 路线被己方棋子阻挡了, 结束 while 循环
+                    if node.owner != self.owner:
+                        # 或存在敌人时, 可以占领该格
+                        squares.append(Square(x, y))
+                        break  # 结束 while 循环
+                squares.append(Square(x, y))
+                x, y = x + dx, y + dy
+            result += squares
+        return tuple(result)
+
+
+class RookUnit(StraightMovingAndAttackingUnit):
+    # TODO: 王車易位功能暂未实现, 需要在王的走法部分补充代码单独进行处理
+    """車(国际象棋与中国象棋通用)"""
+
+    def __init__(self, owner):
+        super(RookUnit, self).__init__(owner)
+        self.directions = [Vector(1, 0), Vector(0, 1), Vector(-1, 0), Vector(0, -1)]  # 車可以前后左右四个方向(纵向、横向)移动, 不限格数
+        self.limited_move_range = 0  # 0 for no limit
+
+    def retrieve_valid_moves(self, starting_square, snapshot):
+        """車的走法(国际象棋与中国象棋完全相同)
+
+        :param starting_square: 当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        return super(RookUnit, self).retrieve_valid_moves(starting_square, snapshot)
+
+
 def do_self_test():
     """以下为模块自测试代码
 
@@ -288,6 +352,11 @@ def do_self_test():
             pawn_charge_direction=Vector(0, -1))
         black_pawns.append(unit_id)
     m = arena.retrieve_valid_moves_of_unit(white_pawns[0])
+    print(m)
+    selected_destination = m[1]
+    arena.move_unit_to_somewhere(white_pawns[0], selected_destination)
+    white_rook = arena.new_unit_recruited_by_player(white, Square(0, 0), RookUnit)
+    m = arena.retrieve_valid_moves_of_unit(white_rook)
     print(m)
 
 

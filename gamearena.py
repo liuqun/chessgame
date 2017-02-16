@@ -379,6 +379,39 @@ class QueenUnit(StraightMovingAndAttackingUnit):
         self.limited_move_range = 0  # 0 for no limit
 
 
+class KingUnit(StraightMovingAndAttackingUnit):
+    """国际象棋王的走法: 直走或斜走, 并且均不限格数"""
+
+    def __init__(self, owner):
+        super(KingUnit, self).__init__(owner)
+        self.directions = \
+            [Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(-1, 1),
+             Vector(-1, 0), Vector(-1, -1), Vector(0, -1), Vector(1, -1)]
+        self.limited_move_range = 1  # 王能朝各个方向走, 但只能走一格
+
+    def retrieve_valid_moves(self, starting_square, snapshot):
+        """国际象棋王的走法
+
+        :param starting_square: 当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        # 王的一般走法是只能走一格(先不考虑王車易位的特殊情况)
+        regular_moves = super(KingUnit, self).retrieve_valid_moves(starting_square, snapshot)
+        result = set(regular_moves)
+        # 上面几个格子可能会被将军, 逐一排除:
+        for y in range(snapshot.ymax):
+            for x in range(snapshot.xmax):
+                node = snapshot.get_node(x, y)
+                if node.unit_id > 0:
+                    unit = node.unit
+                    if unit.owner != self.owner:
+                        dangerous_squares = unit.retrieve_squares_within_shooting_range(Square(x, y), snapshot)
+                        result -= set(dangerous_squares)
+        # TODO: 需要获取更多信息用于实现王車易位功能
+        return tuple(result)
+
+
 def do_self_test():
     """以下为模块自测试代码
 

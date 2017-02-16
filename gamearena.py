@@ -351,6 +351,26 @@ class RookUnit(StraightMovingAndAttackingUnit):
         return super(RookUnit, self).retrieve_valid_moves(starting_square, snapshot)
 
 
+class BishopUnit(StraightMovingAndAttackingUnit):
+    """国际象棋象的走法: 斜走 and 不限格数"""
+
+    def __init__(self, owner):
+        super(BishopUnit, self).__init__(owner)
+        self.directions = [Vector(1, 1), Vector(-1, 1), Vector(-1, -1), Vector(1, -1)]  # 象可以朝四个斜方向移动, 不限格数
+        self.limited_move_range = 0  # 0 for no limit
+
+
+class QueenUnit(StraightMovingAndAttackingUnit):
+    """国际象棋后的走法: 直走或斜走, 并且均不限格数"""
+
+    def __init__(self, owner):
+        super(QueenUnit, self).__init__(owner)
+        self.directions = \
+            [Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(-1, 1),
+             Vector(-1, 0), Vector(-1, -1), Vector(0, -1), Vector(1, -1)]
+        self.limited_move_range = 0  # 0 for no limit
+
+
 def do_self_test():
     """以下为模块自测试代码
 

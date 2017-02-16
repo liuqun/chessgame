@@ -156,50 +156,57 @@ class GameArena:
             rank = self.__battlefield[y]
             for x in range(len(rank)):
                 unit_id = rank[x]
-                unit = Unit(owner=None)
-                if unit_id:
-                    unit.owner = self.__unit_info_list[unit_id - 1].owner
-                builder.set_node(x, y, unit_id, unit)
+                if unit_id > 0:
+                    unit = self.__unit_info_list[unit_id - 1]
+                else:
+                    unit = None
+                builder.set_node(x, y, unit_id, unit_instance=unit)
         return builder.snapshot
 
 
 class Snapshot:
-    def __init__(self, nodes):
+    def __init__(self, xmax, ymax, nodes):
+        if not nodes:
+            nodes = {}
+        self.__xmax = xmax
+        self.__ymax = ymax
         self.__nodes = nodes
 
     @property
     def xmax(self):
-        return len(self.__nodes[0])
+        return self.__xmax
 
     @property
     def ymax(self):
-        return len(self.__nodes)
+        return self.__ymax
 
     def get_node(self, x, y):
-        if 0 <= x < self.xmax and 0 <= y < self.ymax:
-            return self.__nodes[y][x]
-        # 否则上报一个 ValueError 异常:
-        raise ValueError('Error: 坐标越界: get_node(x={},y={})'.format(x, y))
+        try:
+            return self.__nodes[Square(x, y)]
+        except KeyError:
+            if 0 <= x < self.xmax and 0 <= y < self.ymax:
+                return Snapshot.Node(unit_id=0, unit_instance=None)
+            # 否则上报一个 ValueError 异常:
+            raise ValueError('Error: x,y坐标越界: get_node(x={},y={})'.format(x, y))
+
+    class Node:
+        def __init__(self, unit_id, unit_instance=None):
+            self.unit_id = unit_id
+            self.unit = unit_instance
 
 
 class SnapshotBuilder:
     def __init__(self, size):
-        xmax, ymax = size[0], size[1]
-        self.__nodes = [[self.Node() for x in range(xmax)] for y in range(ymax)]
-
-    class Node:
-        def __init__(self):
-            self.unit_id = 0
-            self.owner = None
+        self.__xmax, self.__ymax = size[0], size[1]
+        self.__nodes = {}
 
     @property
     def snapshot(self):
-        return Snapshot(self.__nodes)
+        return Snapshot(xmax=self.__xmax, ymax=self.__ymax, nodes=self.__nodes.copy())
 
-    def set_node(self, x, y, unit_id, unit_info):
-        if 0 <= x < len(self.__nodes[0]) and 0 <= y < len(self.__nodes):
-            self.__nodes[y][x].unit_id = unit_id
-            self.__nodes[y][x].owner = unit_info.owner
+    def set_node(self, x, y, unit_id, unit_instance):
+        if 0 <= x < self.__xmax and 0 <= y < self.__ymax:
+            self.__nodes[Square(x, y)] = Snapshot.Node(unit_id, unit_instance)
         else:
             raise ValueError('Error: 坐标越界: get_node(x={},y={})'.format(x, y))
 
@@ -251,7 +258,8 @@ class PawnUnit(Unit):
             if not node.unit_id:
                 # 斜线方向上没有棋子时兵不能斜吃斜走, 但是吃过路兵除外
                 continue  # FIXME: 此处信息不足, 暂时无法判断能否吃过路兵
-            elif node.owner == self.owner:
+            unit = node.unit
+            if unit.owner == self.owner:
                 continue  # 兵不能斜吃己方棋子
             squares.append(Square(x, y))
         result += squares
@@ -298,7 +306,7 @@ class StraightMovingAndAttackingUnit(Unit):
         for x, y in self.retrieve_squares_within_shooting_range(starting_square, snapshot):
             node = snapshot.get_node(x, y)
             # 可以占领空格或攻击敌人所在的格子, 但不能攻击己方棋子所在的格子:
-            if not node.unit_id or node.owner != self.owner:
+            if not node.unit_id or node.unit.owner != self.owner:
                 squares.append(Square(x, y))
         return tuple(squares)
 

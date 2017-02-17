@@ -221,7 +221,17 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
 
 def main():
+    # 创建背景光源
+    ambientLight = panda3d.core.AmbientLight("ambientLight")
+    ambientLight.setColor((.8, .8, .8, 1))
+    # 创建直射光源
+    directionalLight = panda3d.core.DirectionalLight("directionalLight")
+    directionalLight.setDirection(panda3d.core.LVector3(0, 45, -45))
+    directionalLight.setColor((0.2, 0.2, 0.2, 1))
+
     base = MyChessboard()
+    base.render.setLight(base.render.attachNewNode(ambientLight))  # 设置光源
+    base.render.setLight(base.render.attachNewNode(directionalLight))  # 设置光源
     base.run()
 
 

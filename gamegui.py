@@ -33,7 +33,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
         self.__labels = self.__defaultLabels()
         self.__chessboard = self.__defaultChessboard()
-        self.__selectedSq = False and 0  # 整数 0 或者布尔量 False 都表示当前没有鼠标指针选定的棋盘格子
+        self.__pointingTo = 0  # 取值范围: 整数 0 表示当前没有鼠标指针指向的棋盘格子, 整数 1~64 表示鼠标指向 64 个棋盘方格之一
         self.camera.setPos(x=10.0 * math.sin(0), y=-10.0 * math.cos(0), z=10)
         self.camera.setHpr(h=0, p=-45, r=0)
         # 注册回调函数
@@ -63,11 +63,11 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         squareRoot = self.__chessboard['squareRoot']
 
         # First, clear the current highlight selected square
-        if self.__selectedSq:
-            i = self.__selectedSq - 1
+        if self.__pointingTo:
+            i = self.__pointingTo - 1
             # Erase current mark
             marks[i].hide()
-            self.__selectedSq = False
+            self.__pointingTo = False
 
         # Check to see if we can access the mouse. We need its coordinates later
         if not self.mouseWatcherNode.hasMouse():
@@ -87,7 +87,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             self.__handler.sortEntries()
             i = int(self.__handler.getEntry(0).getIntoNode().getTag('square'))
             marks[i].show()
-            self.__selectedSq = i + 1
+            self.__pointingTo = i + 1
 
         return direct.task.Task.cont
 

@@ -124,7 +124,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         squareRoot = self.render.attachNewNode("squareRoot")
         white = (1, 1, 1, 1)
         black = (0.3, 0.3, 0.3, 1)
-        colors = {0: white, 1: black}
+        colors = {1: white, 0: black}
 
         # For each square
         squares = []

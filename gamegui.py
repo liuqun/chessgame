@@ -33,6 +33,35 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
         self.__labels = self.__defaultLabels()
         self.__chessboard = self.__defaultChessboard()
+        squares = self.__chessboard['squares']  # 后面会通过变量 squares[i] 访问 64 个棋盘方格
+
+        # 载入棋子模型
+        white_piece_model = self.__selectChessPieceModelSytle('models/default')
+        black_piece_model = self.__selectChessPieceModelSytle('models/default')
+        name_order = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook']
+        colors = {
+            'WHITE': (1.000, 1.000, 1.000, 1),  # RGB color for WHITE pieces
+            'BLACK': (0.150, 0.150, 0.150, 1),  # RGB color for BLACK pieces
+        }
+
+        # 创建模型实例
+        # 双方各 16 个棋子: 白棋棋子位于 _square[0]~[15], 黑棋位于 _square[48]~[63]
+        pieces_sorted_by_square = [None] * 64
+        for i, name in zip(range(16), name_order + ['pawn'] * 8):
+            # 实例化棋子的 3D 模型(初始定位到棋盘方格模型的上方)
+            piece_holder = squares[i].attachNewNode("pieceInstanceHolder")
+            piece_holder.setColor(colors['WHITE'])
+            white_piece_model[name].instanceTo(piece_holder)
+            pieces_sorted_by_square[i] = piece_holder
+        for i, name in zip(range(64 - 16, 64), ['pawn'] * 8 + name_order):
+            # 实例化棋子的 3D 模型(初始定位到棋盘方格模型的上方)
+            piece_holder = squares[i].attachNewNode("pieceInstanceHolder")
+            piece_holder.setColor(colors['BLACK'])
+            white_piece_model[name].instanceTo(piece_holder)
+            pieces_sorted_by_square[i] = piece_holder
+
+        # Usage: self.__pieceOnSquare[i], 其中: 0<=i<64. i=0 时代表棋盘 a1 格, i=63 时代表棋盘 h8 格
+        self.__pieceOnSquare = pieces_sorted_by_square
         self.__pointingTo = 0  # 取值范围: 整数 0 表示当前没有鼠标指针指向的棋盘格子, 整数 1~64 表示鼠标指向 64 个棋盘方格之一
         self.camera.setPos(x=10.0 * math.sin(0), y=-10.0 * math.cos(0), z=10)
         self.camera.setHpr(h=0, p=-45, r=0)
@@ -128,6 +157,56 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             holder.hide()
             marks.append(holder)
         return {'squares': squares, 'marks': marks, 'squareRoot': squareRoot}
+
+    def __hasPieceOnSquare(self, i):
+        """检查编号为 i 的方格上当前是否有棋子
+
+        :param i: 格子编号, 有效范围: 0<=i<64
+        :rtype : bool
+        """
+        assert 0 <= i < 64
+        return bool(self.__pieceOnSquare[i])
+
+    def __selectChessPieceModelSytle(self, path='models/default'):
+        """查找载入路径 path 指定风格样式的棋子模型套件"""
+        # Models:
+        king = self.loader.loadModel("{}/king".format(path))
+        queen = self.loader.loadModel("{}/queen".format(path))
+        rook = self.loader.loadModel("{}/rook".format(path))
+        knight = self.loader.loadModel("{}/knight".format(path))
+        bishop = self.loader.loadModel("{}/bishop".format(path))
+        pawn = self.loader.loadModel("{}/pawn".format(path))
+        # Actors
+        king_actor = None
+        queen_actor = None
+        rook_actor = None
+        knight_actor = None
+        bishop_actor = None
+        pawn_actor = None
+        # # TODO: 为棋子添加动画效果
+        # # 可以用 self.__have_animations = True 或 False 进行设置
+        # if self.__have_animations:
+        #     import direct.actor.Actor
+        #     king_actor = direct.actor.Actor.Actor("{}/king".format(style), anims=None)
+        #     queen_actor = direct.actor.Actor.Actor("{}/queen".format(style), anims=None)
+        #     rook_actor = direct.actor.Actor.Actor("{}/rook".format(style), anims=None)
+        #     knight_actor = direct.actor.Actor.Actor("{}/knight".format(style), anims=None)
+        #     bishop_actor = direct.actor.Actor.Actor("{}/bishop".format(style), anims=None)
+        #     pawn_actor = direct.actor.Actor.Actor("{}/pawn".format(style), anims=None)
+        return {
+            'king': king,
+            'queen': queen,
+            'rook': rook,
+            'knight': knight,
+            'bishop': bishop,
+            'pawn': pawn,
+            'king_actor': king_actor,
+            'queen_actor': queen_actor,
+            'rook_actor': rook_actor,
+            'knight_actor': knight_actor,
+            'bishop_actor': bishop_actor,
+            'pawn_actor': pawn_actor,
+        }
 
     @staticmethod
     def __squarePos(i):

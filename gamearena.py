@@ -165,25 +165,13 @@ class GameArena:
         return builder.snapshot
 
 
-class Snapshot:
-    def __init__(self, xmax, ymax, nodes):
-        if not nodes:
-            nodes = {}
-        self.__xmax = xmax
-        self.__ymax = ymax
-        self.__nodes = nodes
-
-    @property
-    def xmax(self):
-        return self.__xmax
-
-    @property
-    def ymax(self):
-        return self.__ymax
+class Snapshot(dict):
+    xmax = 0
+    ymax = 0
 
     def get_node(self, x, y):
         try:
-            return self.__nodes[Square(x, y)]
+            return self[Square(x, y)]
         except KeyError:
             if 0 <= x < self.xmax and 0 <= y < self.ymax:
                 return Snapshot.Node(unit_id=0, unit_instance=None)
@@ -203,7 +191,10 @@ class SnapshotBuilder:
 
     @property
     def snapshot(self):
-        return Snapshot(xmax=self.__xmax, ymax=self.__ymax, nodes=self.__nodes.copy())
+        s = Snapshot(self.__nodes.items())
+        s.xmax = self.__xmax
+        s.ymax = self.__ymax
+        return s
 
     def set_node(self, x, y, unit_id, unit_instance):
         if 0 <= x < self.__xmax and 0 <= y < self.__ymax:
@@ -420,14 +411,14 @@ class KingUnit(StraightMovingAndAttackingUnit):
         regular_moves = super(KingUnit, self).retrieve_valid_moves(starting_square, snapshot)
         result = set(regular_moves)
         # 上面几个格子可能会被将军, 逐一排除:
-        for y in range(snapshot.ymax):
-            for x in range(snapshot.xmax):
-                node = snapshot.get_node(x, y)
-                if node.unit_id > 0:
-                    unit = node.unit
-                    if unit.owner != self.owner:
-                        dangerous_squares = unit.retrieve_squares_within_shooting_range(Square(x, y), snapshot)
-                        result -= set(dangerous_squares)
+        # 下面要从 snapshot 中将王从自己当前所在的位置处移除
+        # 否则王自己也出现在 snapshot 中, 将阻挡敌方棋子的特定进攻路线, 导致计算王可以走的逃跑路线时出现逻辑错误
+        # (测试用例要注意检查被将军时, 王能否向背离敌方車、象或后的方向逃跑)
+        del snapshot[starting_square]
+        for square, node in snapshot.items():
+            if node.unit_id and node.unit.owner != self.owner:
+                dangerous_squares = node.unit.retrieve_squares_within_shooting_range(square, snapshot)
+                result -= set(dangerous_squares)
         # TODO: 需要获取更多信息用于实现王車易位功能
         return tuple(result)
 

@@ -45,7 +45,7 @@ class GameArena:
         xmax = len(self.__battlefield[0])
         return xmax, ymax
 
-    def new_unit_recruited_by_player(self, player_id, square, unit_type, **unit_kwargs):
+    def new_unit_recruited_by_player(self, player_id, square, unit_type):
         """征募一个虚拟单位进入战场, 返回值表示为其分配的编码
 
         :param player_id: 玩家编号, 每个单位必须有一个玩家归属
@@ -55,7 +55,7 @@ class GameArena:
         :return: 为新单位分配的编码, 最小值从 1 开始分配
         :rtype : GameArena.UnitID
         """
-        unit = unit_type(owner=player_id, **unit_kwargs)
+        unit = unit_type(owner=player_id)
         self.__unit_info_list.append(unit)
         unit_id = self.UnitID(len(self.__unit_info_list))
         unit.has_been_moved = False
@@ -211,16 +211,23 @@ class SnapshotBuilder:
             raise ValueError('Error: 坐标越界: get_node(x={},y={})'.format(x, y))
 
 
-class PawnUnit(Unit):
-    def __init__(self, owner, pawn_charge_direction):
+import abc
+
+
+class AbstractPawnUnit(Unit):
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractproperty
+    def pawn_charge_direction(self):
+        return Vector(0, 0)
+
+    def __init__(self, owner):
         """国际象棋的兵
 
         :param owner: 所属玩家
         :param pawn_charge_direction: 指定兵的冲锋方向, DirectionVector 矢量, 一般情况下应设置白方为 Vector(0, 1), 黑方为 Vector(0, -1)
         """
-        super(PawnUnit, self).__init__(owner)
-        self.pawn_charge_direction = \
-            Vector(pawn_charge_direction[0], pawn_charge_direction[1])
+        super(AbstractPawnUnit, self).__init__(owner)
         self.has_been_moved = False  # 是否被移动过(兵第一次移动时可以进行冲锋走两格,之后只能沿棋盘纵列每步走一格)
 
     def retrieve_valid_moves(self, starting_square, snapshot):
@@ -280,6 +287,18 @@ class PawnUnit(Unit):
                 continue  # 此时已经跑到棋盘外面了
             result.append(Square(x, y))
         return tuple(result)
+
+
+class WhitePawnUnit(AbstractPawnUnit):
+    @property
+    def pawn_charge_direction(self):
+        return Vector(0, 1)
+
+
+class BlackPawnUnit(AbstractPawnUnit):
+    @property
+    def pawn_charge_direction(self):
+        return Vector(0, -1)
 
 
 class StraightMovingAndAttackingUnit(Unit):
@@ -439,15 +458,13 @@ def do_self_test():
         unit_id = arena.new_unit_recruited_by_player(
             player_id=white,
             square=Square(x, 1),
-            unit_type=PawnUnit,
-            pawn_charge_direction=Vector(0, 1)
+            unit_type=WhitePawnUnit
         )
         white_pawns.append(unit_id)
         unit_id = arena.new_unit_recruited_by_player(
             player_id=black,
             square=Square(x, 6),
-            unit_type=PawnUnit,
-            pawn_charge_direction=Vector(0, -1))
+            unit_type=BlackPawnUnit)
         black_pawns.append(unit_id)
     m = arena.retrieve_valid_moves_of_unit(white_pawns[0])
     print(m)

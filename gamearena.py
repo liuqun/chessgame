@@ -209,7 +209,7 @@ class SnapshotBuilder:
         if 0 <= x < self.__xmax and 0 <= y < self.__ymax:
             self.__nodes[Square(x, y)] = Snapshot.Node(unit_id, unit_instance)
         else:
-            raise ValueError('Error: 坐标越界: get_node(x={},y={})'.format(x, y))
+            raise ValueError('Error: 坐标越界: set_node(x={},y={})'.format(x, y))
 
 
 import abc

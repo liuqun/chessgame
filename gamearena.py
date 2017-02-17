@@ -79,7 +79,6 @@ class GameArena:
         如果指定的单位已经死亡则将其复活并放入战场, 强制杀死指定位置上原有的单位无论是否是己方单位
         """
         x, y = square[0], square[1]
-        self.__battlefield[y][x] = unit_id
         try:
             # 进行移动前, 先尝试寻找该棋子移动前的位置信息
             square_before_move = self.find_square_from_unit_id(unit_id)
@@ -88,6 +87,8 @@ class GameArena:
             pass
         else:  # 擦除脚印
             self.__battlefield[square_before_move.y][square_before_move.x] = self.UnitID(0)
+        # 然后再将棋子放置到新位置
+        self.__battlefield[y][x] = unit_id
 
     def move_unit_to_somewhere(self, unit_id, square):
         """移动棋子

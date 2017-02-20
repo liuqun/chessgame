@@ -107,13 +107,21 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__pointingTo = 0  # 取值范围: 整数 0 表示当前没有鼠标指针指向的棋盘格子, 整数 1~64 表示鼠标指向 64 个棋盘方格之一
         self.__dragging = 0  # 取值范围: 整数 0 表示当前鼠标指针没有拖拽住棋盘格子上的棋子, 整数 1~64 表示正在拖拽, 被拖拽的棋子原位于 64 个棋盘方格之一
         self.__finger = self.render.attachNewNode("fingerTouching")  # 后面用于设定用户手指正在触摸的棋盘位置
-        self.camera.setPos(x=10.0 * math.sin(0), y=-10.0 * math.cos(0), z=10)
-        self.camera.setHpr(h=0, p=-45, r=0)
         # 注册回调函数
         self.taskMgr.add(self.mouseTask, 'MouseTask')
         self.accept('escape', sys.exit)  # 键盘 Esc 键
         self.accept("mouse1", self.onMouse1Pressed)  # left-click grabs a piece
         self.accept("mouse1-up", self.onMouse1Released)  # releasing places it
+        # 可调整拍摄角度的摄像头:
+        self.axisCameraPitching = self.render.attachNewNode("axisCameraPitching")  # 摄像机环绕原点运动轨道的轴心
+        self.axisCameraPitching.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
+        self.camera.reparentTo(self.axisCameraPitching)
+        self.camera.setPos(x=0, y=-15.0, z=0)
+        self.accept('page_up', self.onKeyboardPageUpPressed)  # 键盘 Page Up / Page Down 调节俯仰角
+        self.accept('page_down', self.onKeyboardPageDownPressed)  # 同上
+        self.accept('wheel_up', self.onMouseWheelRolledUpwards)  # 鼠标滚轮实现镜头缩放
+        self.accept('wheel_down', self.onMouseWheelRolledDownwards)  # 同上
+
 
     def __defaultLabels(self):
         labels = [
@@ -126,6 +134,16 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 text="ESC: Quit",
                 parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
                 style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.1), scale=.05)
+            ,
+            direct.gui.OnscreenText.OnscreenText(
+                text="Mouse wheel: Zoom in/out the camera",
+                parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.15), scale=.05)
+            ,
+            direct.gui.OnscreenText.OnscreenText(
+                text="PageUp/PageDown: Camera orientation",
+                parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.2), scale=.05)
         ]
         return labels
 
@@ -435,6 +453,34 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
     def __squarePos(i):
         """A handy little function for getting the proper position for a given square1"""
         return panda3d.core.LPoint3((i % 8) - 3.5, (i // 8) - 3.5, 0)
+
+    def onKeyboardPageUpPressed(self):
+        delta = -14.5
+        p = self.axisCameraPitching.getP() + delta
+        if p + 10.0 < -90.0:  # p=-90 度时摄像机从顶端垂直向正下方俯视, 初始值 p=-45 度时向斜下方俯视
+            return
+        self.axisCameraPitching.setP(p)
+
+    def onKeyboardPageDownPressed(self):
+        delta = 14.5
+        p = self.axisCameraPitching.getP() + delta
+        if p - 10.0 > 0.0:  # p=0 度时摄像机为水平视角, 0<p<90 则代表从地平面下方向上仰视
+            return
+        self.axisCameraPitching.setP(p)
+
+    def onMouseWheelRolledUpwards(self):
+        scale = 1.04  # Zoom out
+        y = self.camera.getY() * scale
+        if math.fabs(y) > 25.0:
+            return
+        self.camera.setY(y)
+
+    def onMouseWheelRolledDownwards(self):
+        scale = 0.96  # Zoom in
+        y = self.camera.getY() * scale
+        if math.fabs(y) < 12.0:
+            return
+        self.camera.setY(y)
 
 
 def main():

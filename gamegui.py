@@ -83,6 +83,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             # 实例化棋子的 3D 模型(初始定位到棋盘方格模型的上方)
             piece_holder = squares[i].attachNewNode("pieceInstanceHolder")
             piece_holder.setColor(colors['BLACK'])
+            piece_holder.setH(180)  # 转头180°让黑棋的马(或象)与白棋的马面对面
             white_piece_model[name].instanceTo(piece_holder)
             pieces_sorted_by_square[i] = piece_holder
             # Arena 中的对应点位建立相同的棋子:

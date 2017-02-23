@@ -377,16 +377,14 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__pidOnSquare[fr] = 0  # 清除 piece_id1 之前的痕迹
         if pid2:
             # 把被吃掉的棋子送往墓地
-            self.__sendToGraveyard(pid2)
+            self.__sendToGraveyard(piece=piece2, gid=pid2)
 
         # 必须同步移动 Arena 中的棋子
         destination = gamearena.Square(x=to%8, y=to//8)
         self.arena.move_unit_to_somewhere(pid1, destination)
 
-    def __sendToGraveyard(self, pid):
-        piece = self.__pieces[pid]
-        grave_index = pid - 1
-        grave = self.__graveyard['graves'][grave_index]
+    def __sendToGraveyard(self, piece, gid):
+        grave = self.__graveyard['graves'][gid]
         piece.reparentTo(grave)
 
     def __defaultGraveyard(self):
@@ -397,7 +395,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # 另外 16 个小兵生变时只是更改棋子的外观, 不会增加额外的棋子.
         max_pieces = 32
         max_graves = max_pieces
-        graves = []
+        graves = {}
         graveyard = self.render.attachNewNode("graveyard")
         for i in range(max_graves):
             grave = graveyard.attachNewNode("grave")
@@ -406,7 +404,8 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             y = 0.4 * ((i % 16) - 7.5)
             grave.setPos(x, y, 0)
             grave.setScale(0.75)
-            graves.append(grave)
+            gid = i + 1
+            graves[gid] = grave  # 让 graves[] 的下标 gid 从 1 开始
         return {'graves': graves, 'graveyard': graveyard}
 
     def __selectChessPieceModelSytle(self, path='models/default'):

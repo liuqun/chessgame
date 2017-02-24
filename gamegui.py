@@ -612,6 +612,7 @@ class CustomizedPiece(object):
         self.pickerRay.setDirection(0, 0, -1)
         self.collisionNode = panda3d.core.CollisionNode('pieceCollisionNode')
         self.collisionNode.setFromCollideMask(mask)  # 注意是碰撞源(From)
+        self.collisionNode.setIntoCollideMask(panda3d.core.BitMask32.allOff())
         self.collisionNode.addSolid(self.pickerRay)
         self.collisionNP = self.__np.attachNewNode(self.collisionNode)
         self.collisionNP.setPos(0, 0, 0)

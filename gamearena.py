@@ -391,7 +391,7 @@ class QueenUnit(StraightMovingAndAttackingUnit):
 
 
 class KingUnit(StraightMovingAndAttackingUnit):
-    """国际象棋王的走法: 直走或斜走, 并且均不限格数"""
+    """国际象棋王的走法: 直走或斜走, 格数限制只能走1格"""
 
     def __init__(self, owner):
         super(KingUnit, self).__init__(owner)

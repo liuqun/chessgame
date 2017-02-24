@@ -8,6 +8,7 @@ import panda3d.core
 import direct.showbase.ShowBase
 import direct.gui.OnscreenText
 import direct.task.Task
+import direct.interval.LerpInterval
 import gamearena
 
 
@@ -16,7 +17,6 @@ class IllegalMoveException(Exception):
 
 
 class MyChessboard(direct.showbase.ShowBase.ShowBase):
-
     def __init__(self, fStartDirect=True, windowType=None):
         direct.showbase.ShowBase.ShowBase.__init__(self, fStartDirect=fStartDirect, windowType=windowType)
         self.disableMouse()
@@ -37,8 +37,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__picker.addCollider(self.__pickerNP, self.__handler)
 
         self.__labels = self.__defaultLabels()
-        self.__chessboard = self.__defaultChessboard()
-        squares = self.__chessboard['squares']  # 后面会通过变量 squares[i] 访问 64 个棋盘方格
+        self.__chessboardTopCenter = self.render.attachNewNode("chessboardTopCenter")  # 定位棋盘顶面的中心位置
+        self.__pieceRoot = self.__chessboardTopCenter.attachNewNode("pieceRoot")  # 虚拟根节点用于归纳棋子对象
+        self.__chessboard = self.__defaultChessboard(self.__chessboardTopCenter, self.__pieceRoot)
+        squares = self.__chessboard['squares']  # 后面会通过变量 squares[i] 查询 64 个棋盘方格空间位置并挂载全部棋子模型
 
         # 载入棋子模型
         white_piece_model = self.__selectChessPieceModelSytle('models/default')
@@ -73,23 +75,28 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             piece_holder = squares[i].attachNewNode("pieceInstanceHolder")
             piece_holder.setColor(colors['WHITE'])
             white_piece_model[name].instanceTo(piece_holder)
-            pieces_sorted_by_square[i] = piece_holder
             # Arena 中的对应点位建立相同的棋子:
             point = (i % 8, i // 8)
             pid = self.arena.new_unit_recruited_by_player(white_player, point, white_unit_type_list[name])
-            pieces_sorted_by_id[pid] = pieces_sorted_by_square[i]
             piece_id_sorted_by_square[i] = pid
+            piece = CustomizedPiece(piece_holder, mask=panda3d.core.BitMask32.bit(1))
+            piece.setTag('piece', str(pid))
+            pieces_sorted_by_square[i] = piece
+            pieces_sorted_by_id[pid] = piece
         for i, name in zip(range(64 - 16, 64), ['pawn'] * 8 + name_order):
             # 实例化棋子的 3D 模型(初始定位到棋盘方格模型的上方)
             piece_holder = squares[i].attachNewNode("pieceInstanceHolder")
             piece_holder.setColor(colors['BLACK'])
-            white_piece_model[name].instanceTo(piece_holder)
-            pieces_sorted_by_square[i] = piece_holder
+            piece_holder.setH(180)  # 转头180°让黑棋的马(或象)与白棋的马面对面
+            black_piece_model[name].instanceTo(piece_holder)
             # Arena 中的对应点位建立相同的棋子:
             point = (i % 8, i // 8)
             pid = self.arena.new_unit_recruited_by_player(black_player, point, black_unit_type_list[name])
-            pieces_sorted_by_id[pid] = pieces_sorted_by_square[i]
             piece_id_sorted_by_square[i] = pid
+            piece = CustomizedPiece(piece_holder, mask=panda3d.core.BitMask32.bit(1))
+            piece.setTag('piece', str(pid))
+            pieces_sorted_by_square[i] = piece
+            pieces_sorted_by_id[pid] = piece
 
         # 棋子模型与棋盘方格位置一一对应:
         # Usage: self.__pieceOnSquare[i], 其中: 0<=i<64. i=0 时代表棋盘 a1 格, i=63 时代表棋盘 h8 格
@@ -106,14 +113,21 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__graveyard = self.__defaultGraveyard()  # 初始化虚拟墓地空间用于容放被吃掉的棋子
         self.__pointingTo = 0  # 取值范围: 整数 0 表示当前没有鼠标指针指向的棋盘格子, 整数 1~64 表示鼠标指向 64 个棋盘方格之一
         self.__dragging = 0  # 取值范围: 整数 0 表示当前鼠标指针没有拖拽住棋盘格子上的棋子, 整数 1~64 表示正在拖拽, 被拖拽的棋子原位于 64 个棋盘方格之一
-        self.__finger = self.render.attachNewNode("fingerTouching")  # 后面用于设定用户手指正在触摸的棋盘位置
-        self.camera.setPos(x=10.0 * math.sin(0), y=-10.0 * math.cos(0), z=10)
-        self.camera.setHpr(h=0, p=-45, r=0)
+        self.__finger = self.__pieceRoot.attachNewNode('fingerTouching')  # 后面用于设定用户手指正在触摸的棋盘位置
         # 注册回调函数
         self.taskMgr.add(self.mouseTask, 'MouseTask')
         self.accept('escape', sys.exit)  # 键盘 Esc 键
         self.accept("mouse1", self.onMouse1Pressed)  # left-click grabs a piece
         self.accept("mouse1-up", self.onMouse1Released)  # releasing places it
+        # 可调整拍摄角度的摄像头:
+        self.axisCameraPitching = self.render.attachNewNode("axisCameraPitching")  # 摄像机环绕原点运动轨道的轴心
+        self.axisCameraPitching.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
+        self.camera.reparentTo(self.axisCameraPitching)
+        self.camera.setPos(x=0, y=-15.0, z=0)
+        self.accept('page_up', self.onKeyboardPageUpPressed)  # 键盘 Page Up / Page Down 调节俯仰角
+        self.accept('page_down', self.onKeyboardPageDownPressed)  # 同上
+        self.accept('wheel_up', self.onMouseWheelRolledUpwards)  # 鼠标滚轮实现镜头缩放
+        self.accept('wheel_down', self.onMouseWheelRolledDownwards)  # 同上
 
     def __defaultLabels(self):
         labels = [
@@ -126,6 +140,16 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 text="ESC: Quit",
                 parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
                 style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.1), scale=.05)
+            ,
+            direct.gui.OnscreenText.OnscreenText(
+                text="Mouse wheel: Zoom in/out the camera",
+                parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.15), scale=.05)
+            ,
+            direct.gui.OnscreenText.OnscreenText(
+                text="PageUp/PageDown: Camera orientation",
+                parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.2), scale=.05)
         ]
         return labels
 
@@ -140,6 +164,8 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             i = self.__pointingTo - 1
             # Erase current mark
             marks[i].hide()
+            if self.__hasPieceOnSquare(i):
+                self.__pieceOnSquare[i].hideBounds()
             self.__pointingTo = False
 
         # Check to see if we can access the mouse. We need its coordinates later
@@ -152,41 +178,87 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
         # Set the position of the ray based on the mouse position
         self.__pickerRay.setFromLens(self.camNode, mpos.getX(), mpos.getY())
-        if self.__dragging:
-            p = self.render.getRelativePoint(self.camera, self.__pickerRay.getOrigin())
-            v = self.render.getRelativeVector(self.camera, self.__pickerRay.getDirection())
-            h = 0.5
-            t = (h - p.getZ()) / v.getZ()
-            x = p.getX() + v.getX() * t
-            y = p.getY() + v.getY() * t
-            # 将摄像机与鼠标指针两点连线, 再延长, 直线与棋盘平面上方高度 z=H 的水平面相交
-            # 需要计算出交点的绝对坐标(x, y, h), 因为此时握住棋子的手指正处于在这个坐标
-            self.__finger.setPos(x, y, h)
-            # 【备注】
-            # 已知直线的起点为 P=(X0,Y0,Z0), 方向矢量为 V=(u,v,w), 水平面方程为 z=H
-            # 求直线与水平面的交点:
-            # 直线方程组
-            #     x = X0 + u*t
-            #     y = Y0 + v*t
-            #     z = Z0 + w*t
-            # 与 z=h 联立, 消除变量 t 后
-            # x = X1+u*t = X1+u*(h-Z1)/w
-            # y = Y1+v*t = Y1+v*(h-Z1)/w
-            # z = H
 
-        # Do the actual collision pass (Do it only on the squares for efficiency purposes)
-        self.__picker.traverse(squareRoot)
-        if self.__handler.getNumEntries() > 0:
-            # if we have hit something, sort the hits so that the closest is first, and make a mark
-            self.__handler.sortEntries()
-            i = int(self.__handler.getEntry(0).getIntoNode().getTag('square'))
-            marks[i].show()
-            self.__pointingTo = i + 1
+        # 检查鼠标指针指向的棋盘水平面的点的坐标
+        p = self.render.getRelativePoint(self.camera, self.__pickerRay.getOrigin())
+        v = self.render.getRelativeVector(self.camera, self.__pickerRay.getDirection())
+        z = 0
+        t = - p.getZ() / v.getZ()  # t = (z - p.getZ()) / v.getZ() 其中 z = 0
+        x = p.getX() + v.getX() * t
+        y = p.getY() + v.getY() * t
+        self.__finger.setPos(x, y, z)
+        # 已知射线 pickerRay 的起点 p 和方向矢量 v, 这条射线与水平面 z=0 相交
+        # 计算出交点的绝对坐标(x, y, h), 然后让玩家的手指(或手中握着的棋子)指向这个坐标
+        # 【解析几何——三维空间交点坐标算法】
+        # 已知:
+        # 射线起点 P=(X,Y,Z)=(p.getX,p.getY,p.getZ)
+        # 方向矢量 v=(U,V,W)=(v.getX,v.getY,v.getZ)
+        # 求:射线线与水平面 z=0 的交点
+        #
+        # 直线(射线)方程组为
+        #     x = X + U*t
+        #     y = Y + V*t
+        #     z = Z + W*t
+        # 与 z = 0 联立, 消除变量 t 后, 得
+        # x = X+u*t = X+U*(z-Z)/W = X-U*Z/W
+        # y = Y+v*t = Y+V*(z-Z)/W = Y-V*Z/W
+        # z = 0
+
+        if self.__dragging:
+            # 当前拖拽棋子的手指的正下方对应的棋盘格子
+            i = self.__dragging - 1
+            piece = self.__pieceOnSquare[i]
+            piece.picker.traverse(squareRoot)  # 检查棋子正下方的格子编号
+            if piece.handler.getNumEntries() > 0:
+                # if we have hit something, sort the hits so that the closest is first, and make a mark
+                piece.handler.sortEntries()
+                entry = piece.handler.getEntry(0)
+                tag = 'square'
+                value = entry.getIntoNode().getTag(tag)
+                i = int(value)
+                self.__pointingTo = i + 1
+        else:
+            # Do the actual collision pass (Do it only on the squares for efficiency purposes)
+            self.__picker.traverse(self.__pieceRoot)  # 检查鼠标指向哪个棋子
+            if self.__handler.getNumEntries() > 0:
+                self.__handler.sortEntries()
+                entry = self.__handler.getEntry(0)
+                tag = 'piece'
+                value = entry.getIntoNode().getTag(tag)
+                try:
+                    piece_id = int(value)
+                except ValueError:
+                    pass  # Ignore this case
+                else:
+                    for i, pid in enumerate(self.__pidOnSquare):
+                        if pid == piece_id:
+                            self.__pointingTo = i + 1
+                            break
+            else:
+                # Do the actual collision pass with squareRoot
+                self.__picker.traverse(squareRoot)
+                if self.__handler.getNumEntries() > 0:
+                    # if we have hit something, sort the hits so that the closest is first, and make a mark
+                    self.__handler.sortEntries()
+                    entry = self.__handler.getEntry(0)
+                    tag = 'square'
+                    value = entry.getIntoNode().getTag(tag)
+                    i = int(value)
+                    self.__pointingTo = i + 1
+
+        if self.__pointingTo:
+            i = self.__pointingTo - 1
+            if self.__dragging:
+                marks[i].show()
+            if self.__hasPieceOnSquare(i):
+                if not self.__dragging or (self.__dragging and self.__pointingTo != self.__dragging):
+                    self.__pieceOnSquare[i].showBounds()
 
         return direct.task.Task.cont
 
-    def __defaultChessboard(self):
-        squareRoot = self.render.attachNewNode("squareRoot")
+    def __defaultChessboard(self, chessboardTopCenter, pieceRoot):
+        squareRoot = chessboardTopCenter.attachNewNode("squareRoot")
+
         white = (1, 1, 1, 1)
         black = (0.3, 0.3, 0.3, 1)
         colors = {1: white, 0: black}
@@ -208,19 +280,26 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             # Set a tag on the square's node so we can look up what square this is
             # later during the collision pass
             square.find("**/polygon").node().setTag('square', str(i))
-            squares.append(square)
         # Create 64 instances of the same mark
         mark = self.loader.loadModel("models/square")
         mark.setScale(1.02)
         mark.setColor(0, 1, 1)
         marks = []
         for i in range(64):
+            pos = MyChessboard.__squarePos(i)
             # Create instance for every square
-            holder = squares[i].attachNewNode("markInstanceHolder")
+            holder = chessboardTopCenter.attachNewNode("markInstanceHolder")
             mark.instanceTo(holder)
-            holder.setPos(0, 0, 1E-2)  # put marks on top of the squares
+            pos.setZ(pos.getZ() + 1E-2)  # put these items above of the top of squares
+            holder.setPos(pos)
             holder.hide()
             marks.append(holder)
+            # Create 64 fake squares(only for collision traversing)
+            # 创建只包含空间定位信息的伪棋盘方格, 方便后面用执行碰撞检测时遍历所有棋子模型
+            square = pieceRoot.attachNewNode("square")
+            square.setPos(pos)
+            squares.append(square)  # 现在列表容器中存储的内容只是代表棋盘方格位置的空节点了
+
         return {'squares': squares, 'marks': marks, 'squareRoot': squareRoot}
 
     def __hasPieceOnSquare(self, i):
@@ -246,6 +325,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             # 否则取消当前选中的棋子
             i = self.__dragging - 1
             self.__pieceOnSquare[i].reparentTo(self.__chessboard['squares'][i])  # 把棋子重新定位到原来的格子
+            self.__pieceOnSquare[i].setX(0)
+            self.__pieceOnSquare[i].setY(0)
+            self.__pieceOnSquare[i].stop('hovering')
+            self.__pieceOnSquare[i].play('landing')
             self.__dragging = False
             return
 
@@ -254,7 +337,12 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             if self.__hasPieceOnSquare(self.__pointingTo - 1):  # See Case A
                 self.__dragging = self.__pointingTo
                 i = self.__dragging - 1
+                squarePos = self.__chessboard['squares'][i].getPos()
+                x = squarePos.getX() - self.__finger.getX()
+                y = squarePos.getY() - self.__finger.getY()
                 self.__pieceOnSquare[i].reparentTo(self.__finger)  # 抓起一个棋子i
+                self.__pieceOnSquare[i].setPos(x, y, 0)
+                self.__pieceOnSquare[i].play('hovering')
             return
 
         # When we are pointing to the chessboard and we know that we are dragging something already:
@@ -269,9 +357,20 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 piece1_id = self.__pidOnSquare[i1]
                 owner1 = self.arena.owner_of_unit(piece1_id)
                 if owner2 == owner1:  # 棋子颜色相同时, 才可以更换当前选中的棋子
-                    k = self.__dragging - 1
-                    self.__pieceOnSquare[k].reparentTo(self.__chessboard['squares'][k])  # 先把棋子k重新定位到原来的格子
+                    k1 = self.__dragging - 1
+                    self.__pieceOnSquare[k1].reparentTo(self.__chessboard['squares'][k1])  # 先把棋子 1 重新定位到它原来所在的格子
+                    self.__pieceOnSquare[k1].setX(0)
+                    self.__pieceOnSquare[k1].setY(0)
+                    self.__pieceOnSquare[k1].stop('hovering')
+                    self.__pieceOnSquare[k1].play('landing')
                     self.__dragging = self.__pointingTo
+                    # 然后选中棋子 2
+                    k2 = self.__dragging - 1
+                    squarePos = self.__chessboard['squares'][k2].getPos()
+                    x = squarePos.getX() - self.__finger.getX()
+                    y = squarePos.getY() - self.__finger.getY()
+                    self.__pieceOnSquare[k2].setPos(x, y, 0)
+                    self.__pieceOnSquare[k2].play('hovering')
             j = self.__dragging - 1
             self.__pieceOnSquare[j].reparentTo(self.__finger)  # 再抓起一个棋子j
             return
@@ -285,6 +384,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # See Case C
         k = self.__dragging - 1
         self.__pieceOnSquare[k].reparentTo(self.__chessboard['squares'][k])
+        self.__pieceOnSquare[k].setX(0)
+        self.__pieceOnSquare[k].setY(0)
+        self.__pieceOnSquare[k].stop('hovering')
+        self.__pieceOnSquare[k].play('landing')
         self.__dragging = False
         return
 
@@ -331,7 +434,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         if not pid:
             return False
         valid_moves = self.arena.retrieve_valid_moves_of_unit(pid)
-        destination = gamearena.Square(x=to%8, y=to//8)
+        destination = gamearena.Square(x=to % 8, y=to // 8)
         return destination in valid_moves
 
     def __movePiece(self, fr, to):
@@ -354,21 +457,28 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         piece1 = self.__pieces[pid1]
         square2 = self.__chessboard['squares'][to]
         piece1.reparentTo(square2)
+        piece1.setX(0)
+        piece1.setY(0)
+        piece1.stop('hovering')
+        piece1.play('landing')
         self.__pidOnSquare[to] = pid1
         self.__pidOnSquare[fr] = 0  # 清除 piece_id1 之前的痕迹
         if pid2:
             # 把被吃掉的棋子送往墓地
-            self.__sendToGraveyard(pid2)
+            self.__sendToGraveyard(piece=piece2, gid=pid2)
 
         # 必须同步移动 Arena 中的棋子
-        destination = gamearena.Square(x=to%8, y=to//8)
+        destination = gamearena.Square(x=to % 8, y=to // 8)
         self.arena.move_unit_to_somewhere(pid1, destination)
 
-    def __sendToGraveyard(self, pid):
-        piece = self.__pieces[pid]
-        grave_index = pid - 1
-        grave = self.__graveyard['graves'][grave_index]
+    def __sendToGraveyard(self, piece, gid):
+        grave = self.__graveyard['graves'][gid]
         piece.reparentTo(grave)
+        piece.setX(0)
+        piece.setY(0)
+        piece.stop('hovering')
+        piece.play('landing')
+        piece.hideBounds()
 
     def __defaultGraveyard(self):
         """整个墓区
@@ -378,7 +488,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # 另外 16 个小兵生变时只是更改棋子的外观, 不会增加额外的棋子.
         max_pieces = 32
         max_graves = max_pieces
-        graves = []
+        graves = {}
         graveyard = self.render.attachNewNode("graveyard")
         for i in range(max_graves):
             grave = graveyard.attachNewNode("grave")
@@ -387,7 +497,8 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             y = 0.4 * ((i % 16) - 7.5)
             grave.setPos(x, y, 0)
             grave.setScale(0.75)
-            graves.append(grave)
+            gid = i + 1
+            graves[gid] = grave  # 让 graves[] 的下标 gid 从 1 开始
         return {'graves': graves, 'graveyard': graveyard}
 
     def __selectChessPieceModelSytle(self, path='models/default'):
@@ -433,8 +544,159 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
     @staticmethod
     def __squarePos(i):
-        """A handy little function for getting the proper position for a given square1"""
+        """A handy little function for getting the proper position for a given square"""
         return panda3d.core.LPoint3((i % 8) - 3.5, (i // 8) - 3.5, 0)
+
+    def onKeyboardPageUpPressed(self):
+        delta = -14.5
+        p = self.axisCameraPitching.getP() + delta
+        if p + 10.0 < -90.0:  # p=-90 度时摄像机从顶端垂直向正下方俯视, 初始值 p=-45 度时向斜下方俯视
+            return
+        self.axisCameraPitching.setP(p)
+
+    def onKeyboardPageDownPressed(self):
+        delta = 14.5
+        p = self.axisCameraPitching.getP() + delta
+        if p - 10.0 > 0.0:  # p=0 度时摄像机为水平视角, 0<p<90 则代表从地平面下方向上仰视
+            return
+        self.axisCameraPitching.setP(p)
+
+    def onMouseWheelRolledUpwards(self):
+        scale = 1.04  # Zoom out
+        y = self.camera.getY() * scale
+        if math.fabs(y) > 25.0:
+            return
+        self.camera.setY(y)
+
+    def onMouseWheelRolledDownwards(self):
+        scale = 0.96  # Zoom in
+        y = self.camera.getY() * scale
+        if math.fabs(y) < 12.0:
+            return
+        self.camera.setY(y)
+
+
+class CustomizedPiece(object):
+    def __init__(self, node_path, mask):
+        self.__np = node_path
+        b = node_path.getTightBounds()
+        solid = panda3d.core.CollisionBox(b[0], b[1])
+        self.__cb = panda3d.core.CollisionNode('pieceCollisionBox')
+        self.__cb.addSolid(solid)
+        self.__cb.setIntoCollideMask(mask)
+        self.__box = node_path.attachNewNode(self.__cb)
+
+        hovering_interval = direct.interval.LerpInterval.LerpFunc(
+            self._vertical_oscillating_motion,  # function to call
+            duration=20.0,  # duration (in seconds)
+            fromData=0,  # starting value (in radians)
+            toData=49.0 * math.pi,  # ending value
+            # Additional information to pass to self._osllicat
+            extraArgs=[self.__np, 0.25]
+        )
+        landing_interval = direct.interval.LerpInterval.LerpFunc(
+            self._vertical_oscillating_motion,  # function to call
+            duration=0.125,  # duration (in seconds)
+            fromData=-math.pi,  # starting value (in radians)
+            toData=0,  # ending value
+            # Additional information to pass to self._osllicat
+            extraArgs=[self.__np, 0.25]
+        )
+        self.__animations = {
+            'hovering': hovering_interval,
+            'landing': landing_interval,
+        }
+
+        self.pickerRay = panda3d.core.CollisionRay()
+        self.pickerRay.setOrigin(0.0, 0.0, 0.0)
+        self.pickerRay.setDirection(0, 0, -1)
+        self.collisionNode = panda3d.core.CollisionNode('pieceCollisionNode')
+        self.collisionNode.setFromCollideMask(mask)  # 注意是碰撞源(From)
+        self.collisionNode.setIntoCollideMask(panda3d.core.BitMask32.allOff())
+        self.collisionNode.addSolid(self.pickerRay)
+        self.collisionNP = self.__np.attachNewNode(self.collisionNode)
+        self.collisionNP.setPos(0, 0, 0)
+        self.picker = panda3d.core.CollisionTraverser()
+        self.handler = panda3d.core.CollisionHandlerQueue()
+        self.picker.addCollider(self.collisionNP, self.handler)
+
+    @staticmethod
+    def _vertical_oscillating_motion(rad, piece, height):
+        """垂直方向上震荡往复运动
+
+        :param rad: 弧度值
+        :param piece: 棋子对象的 NodePath
+        :param height: 运动轨迹顶点高度, 数值上等于振幅的两倍
+        """
+        wave_amplitude = height * 0.5
+        piece.setZ(wave_amplitude * (1.0 - math.cos(rad)))
+
+    def loop(self, animName, restart=True):
+        try:
+            interval = self.__animations[animName]
+        except KeyError:
+            pass
+        else:
+            if restart:
+                interval.loop()  # restart from the beginning
+            else:
+                interval.resume()  # continue from last position
+
+    def play(self, animName, restart=True):
+        try:
+            interval = self.__animations[animName]
+        except KeyError:
+            pass
+        else:
+            if restart:
+                interval.start()  # start play from the beginning
+            else:
+                interval.resume()  # continue from last position
+
+    def stop(self, animName=None):
+        if not animName:
+            for interval in self.__animations.values():
+                interval.finish()
+            return
+        try:
+            interval = self.__animations[animName]
+        except KeyError:
+            pass
+        else:
+            interval.finish()
+
+    def pause(self, animName=None):
+        intervals = self.__animations.values()
+        if not animName:
+            for interval in intervals:
+                interval.pause()
+        if animName in intervals:
+            interval = self.__animations[animName]
+            interval.pause()
+
+    def setPos(self, *args, **kwargs):
+        self.__np.setPos(*args, **kwargs)
+
+    def setX(self, *args, **kwargs):
+        self.__np.setX(*args, **kwargs)
+
+    def setY(self, *args, **kwargs):
+        self.__np.setY(*args, **kwargs)
+
+    def setZ(self, *args, **kwargs):
+        self.__np.setZ(*args, **kwargs)
+
+    def setTag(self, tagName, tagValue):
+        self.__cb.setTag(tagName, tagValue)
+
+    def reparentTo(self, *args, **kwargs):
+        self.__np.reparentTo(*args, **kwargs)
+
+    def showBounds(self):
+        self.__box.show()
+
+    def hideBounds(self):
+        self.__box.hide()
 
 
 def main():

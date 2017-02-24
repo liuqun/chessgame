@@ -17,7 +17,6 @@ class IllegalMoveException(Exception):
 
 
 class MyChessboard(direct.showbase.ShowBase.ShowBase):
-
     def __init__(self, fStartDirect=True, windowType=None):
         direct.showbase.ShowBase.ShowBase.__init__(self, fStartDirect=fStartDirect, windowType=windowType)
         self.disableMouse()
@@ -129,7 +128,6 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.accept('page_down', self.onKeyboardPageDownPressed)  # 同上
         self.accept('wheel_up', self.onMouseWheelRolledUpwards)  # 鼠标滚轮实现镜头缩放
         self.accept('wheel_down', self.onMouseWheelRolledDownwards)  # 同上
-
 
     def __defaultLabels(self):
         labels = [
@@ -436,7 +434,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         if not pid:
             return False
         valid_moves = self.arena.retrieve_valid_moves_of_unit(pid)
-        destination = gamearena.Square(x=to%8, y=to//8)
+        destination = gamearena.Square(x=to % 8, y=to // 8)
         return destination in valid_moves
 
     def __movePiece(self, fr, to):
@@ -470,7 +468,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             self.__sendToGraveyard(piece=piece2, gid=pid2)
 
         # 必须同步移动 Arena 中的棋子
-        destination = gamearena.Square(x=to%8, y=to//8)
+        destination = gamearena.Square(x=to % 8, y=to // 8)
         self.arena.move_unit_to_somewhere(pid1, destination)
 
     def __sendToGraveyard(self, piece, gid):
@@ -546,7 +544,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
     @staticmethod
     def __squarePos(i):
-        """A handy little function for getting the proper position for a given square1"""
+        """A handy little function for getting the proper position for a given square"""
         return panda3d.core.LPoint3((i % 8) - 3.5, (i // 8) - 3.5, 0)
 
     def onKeyboardPageUpPressed(self):

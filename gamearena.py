@@ -51,7 +51,6 @@ class GameArena:
         :param player_id: 玩家编号, 每个单位必须有一个玩家归属
         :param square: 单位的初始位置
         :param unit_type: 单位的类型, 必须继承 class Unit
-        :param **unit_kwargs: 变长参数表
         :return: 为新单位分配的编码, 最小值从 1 开始分配
         :rtype : GameArena.UnitID
         """
@@ -65,7 +64,6 @@ class GameArena:
             if x < 0 or y < 0 or x >= xmax or y >= ymax:
                 raise ValueError('invalid square:{}'.format(square))
             self.__battlefield[y][x] = unit_id
-            # self.__survivors[unit_id] = Square(x, y)
         return unit_id
 
     def owner_of_unit(self, unit_id):

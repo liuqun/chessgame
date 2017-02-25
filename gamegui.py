@@ -588,9 +588,9 @@ class CustomizedPiece(object):
 
         hovering_interval = direct.interval.LerpInterval.LerpFunc(
             self._vertical_oscillating_motion,  # function to call
-            duration=20.0,  # duration (in seconds)
+            duration=0.4,  # duration (in seconds)
             fromData=0,  # starting value (in radians)
-            toData=49.0 * math.pi,  # ending value
+            toData=math.pi,  # ending value
             # Additional information to pass to self._osllicat
             extraArgs=[self.__np, 0.25]
         )

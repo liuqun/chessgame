@@ -9,6 +9,7 @@ import direct.showbase.ShowBase
 import direct.gui.OnscreenText
 import direct.task.Task
 import direct.interval.LerpInterval
+import direct.gui.DirectCheckButton
 import gamearena
 
 
@@ -285,6 +286,18 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             square.find("**/polygon").node().setTag('square', str(i))
         # Create 64 instances of the same mark
         self.__marksAlwaysVisible = True  # True 时让屏幕一直显示棋子的所有有效走法, 帮助用户分析
+        self.__checkButton = direct.gui.DirectCheckButton.DirectCheckButton(
+            pos=(1.0, 0.0, 0.85),
+            scale=0.03,
+            text_scale=2,
+            text='Show Moves',
+            borderWidth=(0.5, 0.5),
+            pad=(0.5, 1),
+            boxPlacement='left',
+            boxImage=('models/maps/checkbox_unchecked.png', 'models/maps/checkbox_checked.png', None),
+            indicatorValue=self.__marksAlwaysVisible,
+            command=self.toggleChessboardMarksBehavior
+        )
         self.__validMarks = set()  # 用于记录当前被拖拽中的棋子可以走到哪些方格, 0-63 自然数集合
         mark = self.loader.loadModel("models/square")
         mark.setTransparency(panda3d.core.TransparencyAttrib.MDual)
@@ -626,6 +639,25 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         if math.fabs(y) < 12.0:
             return
         self.camera.setY(y)
+
+    def __makeMarksAlwaysVisible(self):
+        self.__marksAlwaysVisible = True
+        if self.__dragging:
+            marks = self.__chessboard['marks']
+            for i in self.__validMarks:
+                marks[i].show()
+
+    def __makeMarksVisibleOnlyWhenSquareIsPointed(self):
+        self.__marksAlwaysVisible = False
+        marks = self.__chessboard['marks']
+        for i in self.__validMarks:
+            marks[i].hide()
+
+    def toggleChessboardMarksBehavior(self, isChecked):
+        if isChecked:
+            self.__makeMarksAlwaysVisible()
+        else:
+            self.__makeMarksVisibleOnlyWhenSquareIsPointed()
 
 
 MarkColor = {

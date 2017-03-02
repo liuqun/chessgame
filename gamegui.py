@@ -281,9 +281,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             # later during the collision pass
             square.find("**/polygon").node().setTag('square', str(i))
         # Create 64 instances of the same mark
+        self.__validMarks = set()  # 用于记录当前被拖拽中的棋子可以走到哪些方格, 0-63 自然数集合
         mark = self.loader.loadModel("models/square")
         mark.setScale(1.02)
-        mark.setColor(0, 1, 1)
+        mark.setTransparency(panda3d.core.TransparencyAttrib.MDual)
         marks = []
         for i in range(64):
             pos = MyChessboard.__squarePos(i)
@@ -292,6 +293,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             mark.instanceTo(holder)
             pos.setZ(pos.getZ() + 1E-2)  # put these items above of the top of squares
             holder.setPos(pos)
+            holder.setColor(MarkColor['UNACCEPTABLE_MOVE'])
             holder.hide()
             marks.append(holder)
             # Create 64 fake squares(only for collision traversing)
@@ -343,6 +345,18 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 self.__pieceOnSquare[i].reparentTo(self.__finger)  # 抓起一个棋子i
                 self.__pieceOnSquare[i].setPos(x, y, 0)
                 self.__pieceOnSquare[i].play('hovering')
+                destinations = mark_indexes_from_coordinates(
+                    self.arena.retrieve_valid_moves_of_unit(unit_id=self.__pidOnSquare[i])
+                )
+                current = {i}
+                previous = self.__validMarks
+                self.__validMarks = set(destinations) | current
+                marks = self.__chessboard['marks']
+                marks[i].setColor(MarkColor['STARTING_POINT'])
+                for tmp in previous - self.__validMarks:
+                    marks[tmp].setColor(MarkColor['UNACCEPTABLE_MOVE'])
+                for tmp in destinations:
+                    marks[tmp].setColor(MarkColor['ACCEPTABLE_MOVE'])
             return
 
         # When we are pointing to the chessboard and we know that we are dragging something already:
@@ -371,6 +385,18 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                     y = squarePos.getY() - self.__finger.getY()
                     self.__pieceOnSquare[k2].setPos(x, y, 0)
                     self.__pieceOnSquare[k2].play('hovering')
+                    destinations = mark_indexes_from_coordinates(
+                        self.arena.retrieve_valid_moves_of_unit(unit_id=self.__pidOnSquare[k2])
+                    )
+                    current = {k2}
+                    previous = self.__validMarks
+                    self.__validMarks = set(destinations) | current
+                    marks = self.__chessboard['marks']
+                    marks[k2].setColor(MarkColor['STARTING_POINT'])
+                    for tmp in previous - self.__validMarks:
+                        marks[tmp].setColor(MarkColor['UNACCEPTABLE_MOVE'])
+                    for tmp in destinations:
+                        marks[tmp].setColor(MarkColor['ACCEPTABLE_MOVE'])
             j = self.__dragging - 1
             self.__pieceOnSquare[j].reparentTo(self.__finger)  # 再抓起一个棋子j
             return
@@ -574,6 +600,20 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         if math.fabs(y) < 12.0:
             return
         self.camera.setY(y)
+
+
+MarkColor = {
+    'STARTING_POINT': panda3d.core.LVecBase4f(0.5, 0.5, 0.5, 0.25),
+    'ACCEPTABLE_MOVE': panda3d.core.LVecBase4f(0, 1, 1, 0.75),
+    'UNACCEPTABLE_MOVE': panda3d.core.LVecBase4f(1, 0, 0, 0.25),
+}
+
+
+def mark_indexes_from_coordinates(coordinates):
+    result = []
+    for (x, y) in coordinates:
+        result.append(x + 8 * y)
+    return tuple(result)
 
 
 class CustomizedPiece(object):

@@ -162,6 +162,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # First, clear the current highlight selected square
         if self.__pointingTo:
             i = self.__pointingTo - 1
+            marks[i].setScale(0.75)
             if not self.__marksAlwaysVisible or not (i in self.__validMarks):
                 # Erase current mark
                 marks[i].hide()
@@ -250,6 +251,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         if self.__pointingTo:
             i = self.__pointingTo - 1
             if self.__dragging:
+                marks[i].setScale(1.02)
                 marks[i].show()
             if self.__hasPieceOnSquare(i):
                 if not self.__dragging or (self.__dragging and self.__pointingTo != self.__dragging):
@@ -285,7 +287,6 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__marksAlwaysVisible = True  # True 时让屏幕一直显示棋子的所有有效走法, 帮助用户分析
         self.__validMarks = set()  # 用于记录当前被拖拽中的棋子可以走到哪些方格, 0-63 自然数集合
         mark = self.loader.loadModel("models/square")
-        mark.setScale(1.02)
         mark.setTransparency(panda3d.core.TransparencyAttrib.MDual)
         marks = []
         for i in range(64):
@@ -296,6 +297,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             pos.setZ(pos.getZ() + 1E-2)  # put these items above of the top of squares
             holder.setPos(pos)
             holder.setColor(MarkColor['UNACCEPTABLE_MOVE'])
+            holder.setScale(0.75)
             holder.hide()
             marks.append(holder)
             # Create 64 fake squares(only for collision traversing)

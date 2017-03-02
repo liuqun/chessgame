@@ -162,8 +162,9 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # First, clear the current highlight selected square
         if self.__pointingTo:
             i = self.__pointingTo - 1
-            # Erase current mark
-            marks[i].hide()
+            if not self.__marksAlwaysVisible or not (i in self.__validMarks):
+                # Erase current mark
+                marks[i].hide()
             if self.__hasPieceOnSquare(i):
                 self.__pieceOnSquare[i].hideBounds()
             self.__pointingTo = False
@@ -281,6 +282,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             # later during the collision pass
             square.find("**/polygon").node().setTag('square', str(i))
         # Create 64 instances of the same mark
+        self.__marksAlwaysVisible = True  # True 时让屏幕一直显示棋子的所有有效走法, 帮助用户分析
         self.__validMarks = set()  # 用于记录当前被拖拽中的棋子可以走到哪些方格, 0-63 自然数集合
         mark = self.loader.loadModel("models/square")
         mark.setScale(1.02)
@@ -332,6 +334,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             self.__pieceOnSquare[i].stop('hovering')
             self.__pieceOnSquare[i].play('landing')
             self.__dragging = False
+            if self.__marksAlwaysVisible:
+                marks = self.__chessboard['marks']
+                for i in self.__validMarks:
+                    marks[i].hide()
             return
 
         # When we are pointing to the chessboard:
@@ -357,6 +363,9 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                     marks[tmp].setColor(MarkColor['UNACCEPTABLE_MOVE'])
                 for tmp in destinations:
                     marks[tmp].setColor(MarkColor['ACCEPTABLE_MOVE'])
+                if self.__marksAlwaysVisible:
+                    for tmp in self.__validMarks:
+                        marks[tmp].show()
             return
 
         # When we are pointing to the chessboard and we know that we are dragging something already:
@@ -377,6 +386,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                     self.__pieceOnSquare[k1].setY(0)
                     self.__pieceOnSquare[k1].stop('hovering')
                     self.__pieceOnSquare[k1].play('landing')
+                    if self.__marksAlwaysVisible:
+                        marks = self.__chessboard['marks']
+                        for i in self.__validMarks:
+                            marks[i].hide()
                     self.__dragging = self.__pointingTo
                     # 然后选中棋子 2
                     k2 = self.__dragging - 1
@@ -397,6 +410,9 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                         marks[tmp].setColor(MarkColor['UNACCEPTABLE_MOVE'])
                     for tmp in destinations:
                         marks[tmp].setColor(MarkColor['ACCEPTABLE_MOVE'])
+                    if self.__marksAlwaysVisible:
+                        for tmp in self.__validMarks:
+                            marks[tmp].show()
             j = self.__dragging - 1
             self.__pieceOnSquare[j].reparentTo(self.__finger)  # 再抓起一个棋子j
             return
@@ -415,6 +431,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__pieceOnSquare[k].stop('hovering')
         self.__pieceOnSquare[k].play('landing')
         self.__dragging = False
+        if self.__marksAlwaysVisible:
+            marks = self.__chessboard['marks']
+            for i in self.__validMarks:
+                marks[i].hide()
         return
 
     def onMouse1Released(self):
@@ -439,6 +459,10 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 pass
             else:
                 self.__dragging = False
+                if self.__marksAlwaysVisible:
+                    marks = self.__chessboard['marks']
+                    for i in self.__validMarks:
+                        marks[i].hide()
             return
 
         # Finally, now

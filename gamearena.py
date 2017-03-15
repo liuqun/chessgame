@@ -87,6 +87,10 @@ class GameArena:
             self.__battlefield[square_before_move.y][square_before_move.x] = self.UnitID(0)
         # 然后再将棋子放置到新位置
         self.__battlefield[y][x] = unit_id
+        # 检查小兵是否走到底排
+        unit = self.__unit_info_list[unit_id-1]
+        if isinstance(unit,AbstractPawnUnit):
+            unit.check_bottom(y)
 
     def move_unit_to_somewhere(self, unit_id, square):
         """移动棋子
@@ -219,6 +223,7 @@ class AbstractPawnUnit(Unit):
         """
         super(AbstractPawnUnit, self).__init__(owner)
         self.has_been_moved = False  # 是否被移动过(兵第一次移动时可以进行冲锋走两格,之后只能沿棋盘纵列每步走一格)
+        self.has_been_queen = False
 
     def retrieve_valid_moves(self, starting_square, snapshot):
         """兵只直走和斜吃两种情况(吃过路兵功能未实现, 需要另外单独处理)
@@ -227,6 +232,8 @@ class AbstractPawnUnit(Unit):
         :param snapshot: 作战双方棋子的位置的一个快照
         :rtype : tuple
         """
+        if self.has_been_queen:
+            return self.retrieve_valid_moves_queen(starting_square, snapshot)
         result = []
 
         # 先分析直走
@@ -262,6 +269,15 @@ class AbstractPawnUnit(Unit):
         result += squares
         return tuple(result)
 
+    def retrieve_valid_moves_queen(self, starting_square, snapshot):
+        squares = []
+        for x, y in self.retrieve_squares_within_shooting_range_queen(starting_square, snapshot):
+            node = snapshot.get_node(x, y)
+            # 可以占领空格或攻击敌人所在的格子, 但不能攻击己方棋子所在的格子:
+            if not node.unit_id or node.unit.owner != self.owner:
+                squares.append(Square(x, y))
+        return tuple(squares)
+
     def retrieve_squares_within_shooting_range(self, starting_square, snapshot):
         """分析兵可以攻击的两格火力点(射程), 不需要区分目标格子上是否为己方的棋子
 
@@ -278,6 +294,44 @@ class AbstractPawnUnit(Unit):
             result.append(Square(x, y))
         return tuple(result)
 
+    def retrieve_squares_within_shooting_range_queen(self, starting_square, snapshot):
+        """计算沿直线走和吃子的棋子可以的所有火力点(当前火力射程范围), 不需要区分目标格子上是敌方还是己方的棋子
+
+        :param starting_square: 当前位置
+        :param snapshot: 作战双方棋子的位置的一个快照
+        :rtype : tuple
+        """
+        result = []
+        for dx, dy in self.directions:  # 每个方向单独处理
+            squares = []
+            step_count = 1
+            x, y = starting_square[0] + dx, starting_square[1] + dy
+            # 若不限制棋子移动格数则一直循环, 直到碰到其他棋子或者棋盘边界:
+            while step_count <= self.limited_move_range if self.limited_move_range > 0 else True:
+                step_count += 1
+                if x < 0 or x >= snapshot.xmax or y < 0 or y >= snapshot.ymax:
+                    # 此时已经跑到棋盘外面了, 结束 while 循环
+                    break
+                node = snapshot.get_node(x, y)
+                if node.unit_id > 0:
+                    # 存在敌人时, 火力线被敌人阻挡, 火力覆盖不到后面的位置了
+                    # 存在己方棋子时, 火力线则被己方阻挡, 结果同上
+                    squares.append(Square(x, y))
+                    break  # 结束 while 循环
+                squares.append(Square(x, y))
+                x, y = x + dx, y + dy
+            result += squares
+        return tuple(result)
+
+    def check_bottom(self,y):
+        t = self.pawn_charge_direction.dy,y
+        if t == (1,7) or t == (-1,0):
+            # 变生成女皇
+            self.has_been_queen=True
+            self.directions = \
+                [Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(-1, 1),
+                 Vector(-1, 0), Vector(-1, -1), Vector(0, -1), Vector(1, -1)]
+            self.limited_move_range = 0  # 0 for no limit
 
 class WhitePawnUnit(AbstractPawnUnit):
     @property

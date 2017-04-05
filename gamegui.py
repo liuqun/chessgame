@@ -115,11 +115,15 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.__pointingTo = 0  # 取值范围: 整数 0 表示当前没有鼠标指针指向的棋盘格子, 整数 1~64 表示鼠标指向 64 个棋盘方格之一
         self.__dragging = 0  # 取值范围: 整数 0 表示当前鼠标指针没有拖拽住棋盘格子上的棋子, 整数 1~64 表示正在拖拽, 被拖拽的棋子原位于 64 个棋盘方格之一
         self.__finger = self.__pieceRoot.attachNewNode('fingerTouching')  # 后面用于设定用户手指正在触摸的棋盘位置
+        self.__mouse3 = None # 用于鼠标右键
+        self.__hsymbol = 1
         # 注册回调函数
         self.taskMgr.add(self.mouseTask, 'MouseTask')
         self.accept('escape', sys.exit)  # 键盘 Esc 键
         self.accept("mouse1", self.onMouse1Pressed)  # left-click grabs a piece
         self.accept("mouse1-up", self.onMouse1Released)  # releasing places it
+        self.accept("mouse3", self.onMouse3Pressed)
+        self.accept("mouse3-up", self.onMouse3Released)
         # 可调整拍摄角度的摄像头:
         self.axisCameraPitching = self.render.attachNewNode("axisCameraPitching")  # 摄像机环绕原点运动轨道的轴心
         self.axisCameraPitching.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
@@ -257,7 +261,17 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
             if self.__hasPieceOnSquare(i):
                 if not self.__dragging or (self.__dragging and self.__pointingTo != self.__dragging):
                     self.__pieceOnSquare[i].showBounds()
-
+        if self.__mouse3:
+            fold = 50
+            h = self.__mouse3[2] + self.__hsymbol*fold*(self.__mouse3[0] - mpos.getX())
+            p = self.__mouse3[3] - fold*(self.__mouse3[1] - mpos.getY())
+            self.axisCameraPitching.setH(h)
+            if p < 0 and p > -90:
+                self.axisCameraPitching.setP(p)
+            h_symbol =  1 if mpos.getY() <=0 else -1
+            if h_symbol!=self.__hsymbol:
+                self.__mouse3 = (mpos.getX(),mpos.getY(),self.axisCameraPitching.getH(),self.axisCameraPitching.getP())
+                self.__hsymbol = h_symbol
         return direct.task.Task.cont
 
     def __defaultChessboard(self, chessboardTopCenter, pieceRoot):
@@ -488,6 +502,15 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         #   3: We just release mouse1 while pointing to the same square for a second time!
         # So we don't need to do anything here. See Case C
         return
+
+    def onMouse3Pressed(self):
+        mpos = self.mouseWatcherNode.getMouse()
+        # h_symbol is a symbol to decide the direction
+        self.hsymbol = 1 if mpos.getY() <=0 else -1
+        self.__mouse3 = (mpos.getX(),mpos.getY(),self.axisCameraPitching.getH(),self.axisCameraPitching.getP())
+
+    def onMouse3Released(self):
+        self.__mouse3 = None
 
     def __isLegalMove(self, fr, to):
         """

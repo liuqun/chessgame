@@ -1,6 +1,6 @@
 @echo on
 
-set PANDA_DIR=C:\Panda3D-1.9.3
+set PANDA_DIR=C:\Panda3D-1.9.4-x64
 
 set BUILD_NAME=Chess
 set VERSION=alpha

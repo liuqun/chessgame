@@ -121,9 +121,9 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.accept("mouse1", self.onMouse1Pressed)  # left-click grabs a piece
         self.accept("mouse1-up", self.onMouse1Released)  # releasing places it
         # 可调整拍摄角度的摄像头:
-        self.axisCameraPitching = self.render.attachNewNode("axisCameraPitching")  # 摄像机环绕原点运动轨道的轴心
-        self.axisCameraPitching.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
-        self.camera.reparentTo(self.axisCameraPitching)
+        self.axisCameraHolder = self.render.attachNewNode("axisCameraHolder")  # 摄像机环绕原点运动轨道的轴心
+        self.axisCameraHolder.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
+        self.camera.reparentTo(self.axisCameraHolder)
         self.camera.setPos(x=0, y=-15.0, z=0)
         self.accept('page_up', self.onKeyboardPageUpPressed)  # 键盘 Page Up / Page Down 调节俯仰角
         self.accept('page_down', self.onKeyboardPageDownPressed)  # 同上
@@ -614,17 +614,17 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
 
     def onKeyboardPageUpPressed(self):
         delta = -14.5
-        p = self.axisCameraPitching.getP() + delta
+        p = self.axisCameraHolder.getP() + delta
         if p + 10.0 < -90.0:  # p=-90 度时摄像机从顶端垂直向正下方俯视, 初始值 p=-45 度时向斜下方俯视
             return
-        self.axisCameraPitching.setP(p)
+        self.axisCameraHolder.setP(p)
 
     def onKeyboardPageDownPressed(self):
         delta = 14.5
-        p = self.axisCameraPitching.getP() + delta
+        p = self.axisCameraHolder.getP() + delta
         if p - 10.0 > 0.0:  # p=0 度时摄像机为水平视角, 0<p<90 则代表从地平面下方向上仰视
             return
-        self.axisCameraPitching.setP(p)
+        self.axisCameraHolder.setP(p)
 
     def onMouseWheelRolledUpwards(self):
         scale = 1.04  # Zoom out

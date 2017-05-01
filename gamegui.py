@@ -125,10 +125,32 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         self.axisCameraHolder.setHpr(h=0, p=-45, r=0)  # 初始摄像头的角度是斜向下俯视 p=-45 度(假如 p=-90 度时则代表垂直俯视视角)
         self.camera.reparentTo(self.axisCameraHolder)
         self.camera.setPos(x=0, y=-15.0, z=0)
+        self.cameraMovingInterval = None
+        self.rotateCameraPeriod = 0.8  # 定义摄像头每旋转 90 度所需要的秒数
+        self.accept('arrow_left', self.onKeyboardArrowLeftPressed)  # 键盘左右箭头分别是顺逆时针旋转棋盘 90 度
+        self.accept('arrow_right', self.onKeyboardArrowRightPressed)  # 同上
         self.accept('page_up', self.onKeyboardPageUpPressed)  # 键盘 Page Up / Page Down 调节俯仰角
         self.accept('page_down', self.onKeyboardPageDownPressed)  # 同上
         self.accept('wheel_up', self.onMouseWheelRolledUpwards)  # 鼠标滚轮实现镜头缩放
         self.accept('wheel_down', self.onMouseWheelRolledDownwards)  # 同上
+
+    def onKeyboardArrowLeftPressed(self):
+        if self.cameraMovingInterval and self.cameraMovingInterval.isPlaying():
+            self.cameraMovingInterval.pause()
+        h, p, r = self.axisCameraHolder.getHpr()
+        h2 = (int(h + 89) / 90 - 1) * 90
+        time = (h - h2) / 90.0 * self.rotateCameraPeriod
+        self.cameraMovingInterval = self.axisCameraHolder.hprInterval(time, panda3d.core.LVector3(h2, p, r))
+        self.cameraMovingInterval.start()
+
+    def onKeyboardArrowRightPressed(self):
+        if self.cameraMovingInterval and self.cameraMovingInterval.isPlaying():
+            self.cameraMovingInterval.pause()
+        h, p, r = self.axisCameraHolder.getHpr()
+        h2 = (int(h) / 90 + 1) * 90
+        time = (h2 - h) / 90.0 * self.rotateCameraPeriod
+        self.cameraMovingInterval = self.axisCameraHolder.hprInterval(time, panda3d.core.LVector3(h2, p, r))
+        self.cameraMovingInterval.start()
 
     def __defaultLabels(self):
         labels = [
@@ -151,6 +173,11 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 text="PageUp/PageDown: Camera orientation",
                 parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
                 style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.2), scale=.05)
+            ,
+            direct.gui.OnscreenText.OnscreenText(
+                text="Left/Right: Camera rotation",
+                parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.25), scale=.05)
         ]
         return labels
 

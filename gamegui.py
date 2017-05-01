@@ -37,6 +37,7 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
         # Register the ray as something that can cause collisions
         self.__picker.addCollider(self.__pickerNP, self.__handler)
 
+        self.__enableChineseFont = True  # 支持中文字体显示
         self.__labels = self.__defaultLabels()
         self.__chessboardTopCenter = self.render.attachNewNode("chessboardTopCenter")  # 定位棋盘顶面的中心位置
         self.__pieceRoot = self.__chessboardTopCenter.attachNewNode("pieceRoot")  # 虚拟根节点用于归纳棋子对象
@@ -179,7 +180,29 @@ class MyChessboard(direct.showbase.ShowBase.ShowBase):
                 parent=self.a2dTopLeft, align=panda3d.core.TextNode.ALeft,
                 style=1, fg=(1, 1, 1, 1), pos=(0.06, -0.25), scale=.05)
         ]
+        if self.__enableChineseFont:
+            font = self.__loadDefaultChineseFont()
+            title_cn = direct.gui.OnscreenText.OnscreenText(
+                text=b"国际象棋演示程序".decode('utf8'),
+                font=font,
+                parent=self.a2dBottomLeft, align=panda3d.core.TextNode.ALeft,
+                style=1, fg=(1, 1, 1, 1), pos=(0.06, 0.1), scale=.07)
+            labels.append(title_cn)
         return labels
+
+    def __loadDefaultChineseFont(self):
+        """尝试加载中文字体 fonts 目录下的 ttf 中文字体
+
+        :rtype : TextFont 或 None
+        """
+        font = None
+        try:
+            font = self.loader.loadFont('fonts/msyh.ttf')  # TODO: 默认中文字体名称目前是写死的, 以后再去支持字体切换功能
+        except IOError as e:
+            print(e.message)
+            print('Can not load *.ttf/ttc, fallback to default font')
+            font = self.loader.loadFont('cmss12')  # Fallback safe font
+        return font
 
     def mouseTask(self, task):
         """mouseTask deals with the highlighting and dragging based on the mouse"""
@@ -832,6 +855,26 @@ def main():
     directionalLight = panda3d.core.DirectionalLight("directionalLight")
     directionalLight.setDirection(panda3d.core.LVector3(0, 45, -45))
     directionalLight.setColor((0.2, 0.2, 0.2, 1))
+
+    import os
+
+    # 复制 C:\Windows\Fonts 下的字体文件
+    try:
+        # 如果之前未曾创建 fonts 子目录, 则创建 fonts 目录, 然后执行一次字体文件复制操作
+        os.mkdir('fonts')
+        if 'nt' == os.name:
+            # OS is Windows NT
+            os.system(r'copy/Y %windir%\Fonts\sim*.tt? fonts')  # 复制简体中文字体 sim*.ttf/ttc
+            os.system(r'copy/Y %windir%\Fonts\ms*.tt? fonts')  # 复制微软字体
+        else:
+            s = os.getcwdu().encode() + '/fonts'
+            print('Warning: Please copy Chinese fonts into %s' % s)
+    except OSError as e:
+        message = os.strerror(e.errno)
+        if 'File exists' == message:
+            pass
+        else:
+            print(message)
 
     base = MyChessboard()
     base.render.setLight(base.render.attachNewNode(ambientLight))  # 设置光源

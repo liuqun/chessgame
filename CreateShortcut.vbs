@@ -1,4 +1,4 @@
-pathToPythonwExe = "C:\Panda3D-1.9.4-x64\python\pythonw.exe"
+pathToPythonwExe = "E:\BaiduNetdiskDownload\Panda3D-1.9.4-x64\python\pythonw.exe"
 pathToMainPy = "main.py"
 
 set WshShell = WScript.CreateObject("WScript.Shell")
